@@ -14,7 +14,6 @@ from logging import Formatter, FileHandler
 from flask_wtf import Form
 from forms import *
 
-
 # ----------------------------------------------------------------------------#
 # App Config.
 # ----------------------------------------------------------------------------#
@@ -42,14 +41,11 @@ class Venue(db.Model):
     address = db.Column(db.String(120))
     phone = db.Column(db.String(120))
     genre = db.Column(db.String(120))
-    image_link = db.Column(db.String(500))
+    image_link = db.Column(db.String(500), nullable=True)
     website_link = db.Column(db.String(120), default=None)
     facebook_link = db.Column(db.String(120))
-    looking_for_venues = db.Column(db.Boolean(), default=False)
+    looking_for_talent = db.Column(db.Boolean(), default=False)
     seeking_description = db.Column(db.String(), default=None)
-
-
-
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
@@ -68,8 +64,6 @@ class Artist(db.Model):
     website_link = db.Column(db.String(120), default=None)
     looking_for_venues = db.Column(db.Boolean(), default=False)
     seeking_description = db.Column(db.String(), default=None)
-
-
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
@@ -129,7 +123,7 @@ def venues():
             "num_upcoming_shows": 0,
         }]
     }]
-    return render_template('pages/venues.html', areas=data);
+    return render_template('pages/venues.html', areas=data)
 
 
 @app.route('/venues/search', methods=['POST'])
@@ -245,15 +239,30 @@ def create_venue_form():
 
 @app.route('/venues/create', methods=['POST'])
 def create_venue_submission():
+    if request.method == 'POST':
+        add = request.form.get
+        try:
+
+            new_venue = Venue(name=add('name'), city=add('city'), state=add('state'), address=add('address'),
+                              phone=add('phone'), genre=add('genre'), webiste_link=add('website_link'), facebook_link=add('facebook_link'),
+                              looking_for_talent=add('seeking_talent'), seeking_description=add('seeking_description'))
+            db.session.add(new_venue)
+            db.session.commit()
+            flash('Venue ' + request.form['name'] + ' was successfully listed!')
+        except:
+            db.session.rollback()
+            flash('An error occurred. Venue ' + add('name') + ' could not be listed.')
+        return render_template('pages/home.html')
+
     # TODO: insert form data as a new Venue record in the db, instead
     # TODO: modify data to be the data object returned from db insertion
 
     # on successful db insert, flash success
-    flash('Venue ' + request.form['name'] + ' was successfully listed!')
+
     # TODO: on unsuccessful db insert, flash an error instead.
-    # e.g., flash('An error occurred. Venue ' + data.name + ' could not be listed.')
-    # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
-    return render_template('pages/home.html')
+    # e.g.,
+
+
 
 
 @app.route('/venues/<venue_id>', methods=['DELETE'])
@@ -549,7 +558,7 @@ if not app.debug:
 
 @app.shell_context_processor
 def shell():
-    return {'db':db}
+    return {'db': db}
 
 
 # ----------------------------------------------------------------------------#
