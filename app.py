@@ -41,10 +41,10 @@ class Venue(db.Model):
     address = db.Column(db.String(120))
     phone = db.Column(db.String(120))
     genre = db.Column(db.String(120))
-    image_link = db.Column(db.String(500), nullable=True)
+    image_link = db.Column(db.String(500))
     website_link = db.Column(db.String(120), default=None)
     facebook_link = db.Column(db.String(120))
-    looking_for_talent = db.Column(db.Boolean(), default=False)
+    looking_for_talent = db.Column(db.String, default=False)
     seeking_description = db.Column(db.String(), default=None)
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
@@ -61,9 +61,9 @@ class Artist(db.Model):
     genres = db.Column(db.String(120))
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
-    website_link = db.Column(db.String(120), default=None)
-    looking_for_venues = db.Column(db.Boolean(), default=False)
-    seeking_description = db.Column(db.String(), default=None)
+    website_link = db.Column(db.String(120))
+    looking_for_venues = db.Column(db.String())
+    seeking_description = db.Column(db.String())
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
@@ -239,28 +239,22 @@ def create_venue_form():
 
 @app.route('/venues/create', methods=['POST'])
 def create_venue_submission():
-    if request.method == 'POST':
-        add = request.form.get
-        try:
+    add = request.form.get
+    try:
 
-            new_venue = Venue(name=add('name'), city=add('city'), state=add('state'), address=add('address'),
-                              phone=add('phone'), genre=add('genre'), webiste_link=add('website_link'), facebook_link=add('facebook_link'),
-                              looking_for_talent=add('seeking_talent'), seeking_description=add('seeking_description'))
-            db.session.add(new_venue)
-            db.session.commit()
-            flash('Venue ' + request.form['name'] + ' was successfully listed!')
-        except:
-            db.session.rollback()
-            flash('An error occurred. Venue ' + add('name') + ' could not be listed.')
-        return render_template('pages/home.html')
+        new_venue = Venue(name=add('name'), city=add('city'), state=add('state'), address=add('address'),
+                          phone=add('phone'), genre=add('genre'), website_link=add('website_link'),
+                          facebook_link=add('facebook_link'),
+                          looking_for_talent=add('seeking_talent'), seeking_description=add('seeking_description'))
+        db.session.add(new_venue)
+        db.session.commit()
+        flash('Venue ' + request.form['name'] + ' was successfully listed!')
+    except:
+        db.session.rollback()
+        flash('An error occurred. Venue ' + add('name') + ' could not be listed.')
+    return render_template('pages/home.html')
 
-    # TODO: insert form data as a new Venue record in the db, instead
-    # TODO: modify data to be the data object returned from db insertion
 
-    # on successful db insert, flash success
-
-    # TODO: on unsuccessful db insert, flash an error instead.
-    # e.g.,
 
 
 
@@ -458,15 +452,21 @@ def create_artist_form():
 
 @app.route('/artists/create', methods=['POST'])
 def create_artist_submission():
-    # called upon submitting the new artist listing form
-    # TODO: insert form data as a new Venue record in the db, instead
-    # TODO: modify data to be the data object returned from db insertion
+    add = request.form.get
+    try:
 
-    # on successful db insert, flash success
-    flash('Artist ' + request.form['name'] + ' was successfully listed!')
-    # TODO: on unsuccessful db insert, flash an error instead.
-    # e.g., flash('An error occurred. Artist ' + data.name + ' could not be listed.')
+        new_artist = Artist(name=add('name'), city=add('city'), state=add('state'),
+                            phone=add('phone'), genres=add('genre'), website_link=add('website_link'),
+                            facebook_link=add('facebook_link'), image_link=add('image_link'),
+                            looking_for_venues=add('seeking_venue'), seeking_description=add('seeking_description'))
+        db.session.add(new_artist)
+        db.session.commit()
+        flash('Artist' + request.form['name'] + ' was successfully listed!')
+    except:
+        db.session.rollback()
+        flash('An error occurred. Artist ' + add('name') + ' could not be listed.')
     return render_template('pages/home.html')
+
 
 
 #  Shows
