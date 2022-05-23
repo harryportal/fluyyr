@@ -16,7 +16,7 @@ class ShowForm(Form):
         default= datetime.today()
     )
 
-class VenueForm(FLaskForm):
+class VenueForm(FlaskForm):
     name = StringField(
         'name', validators=[DataRequired()]
     )
