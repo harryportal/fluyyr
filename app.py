@@ -30,6 +30,19 @@ migrate = Migrate(app, db)
 # ----------------------------------------------------------------------------#
 # Models.
 # ----------------------------------------------------------------------------#
+class Shows(db.Model):
+    __tablename__ = 'Shows'
+    id = db.Column(db.Integer, primary_key=True)
+    artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'), nullable=False)
+    venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'), nullable=False)
+    show_time = db.Column(db.String(100), nullable=False)
+    artist_name = db.Column(db.String(100))
+    artist_image_link = db.Column(db.String(250))
+    venue_name = db.Column(db.String(100))
+
+
+
+
 class Area(db.Model):
     __tablename__ = 'Area'
     id = db.Column(db.Integer, primary_key=True)
@@ -51,9 +64,10 @@ class Venue(db.Model):
     image_link = db.Column(db.String(500))
     website_link = db.Column(db.String(120), default=None)
     facebook_link = db.Column(db.String(120))
-    looking_for_talent = db.Column(db.String, default=False)
-    seeking_description = db.Column(db.String(), default=None)
+    looking_for_talent = db.Column(db.Boolean(), default=False)
+    seeking_description = db.Column(db.String(200), default=None)
     area = db.Column(db.Integer, db.ForeignKey('Area.id'), nullable=False)
+    shows = db.relationship('Shows', backref='venue', lazy=True)
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
@@ -70,8 +84,9 @@ class Artist(db.Model):
     image_link = db.Column(db.String(500))
     facebook_link = db.Column(db.String(120))
     website_link = db.Column(db.String(120))
-    looking_for_venues = db.Column(db.String())
-    seeking_description = db.Column(db.String())
+    looking_for_venues = db.Column(db.Boolean())
+    seeking_description = db.Column(db.String(200))
+    shows = db.relationship('Shows', backref='artist', lazy=True)
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
 
@@ -118,14 +133,11 @@ def search_venues():
     # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
     # seach for Hop should return "The Musical Hop".
     # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
-    response = {
-        "count": 1,
-        "data": [{
-            "id": 2,
-            "name": "The Dueling Pianos Bar",
-            "num_upcoming_shows": 0,
-        }]
-    }
+    searched_term = request.form.get('search_term')
+    response = (Venue.query.filter((Venue.city.ilike('%' + searched_term + '%') |
+                                    Venue.name.ilike('%' + searched_term + '%') |
+                                    Venue.state.ilike('%' + searched_term + '%') |
+                                    Venue.genres.ilike('%' + searched_term + '%'))))
     return render_template('pages/search_venues.html', results=response,
                            search_term=request.form.get('search_term', ''))
 
@@ -158,9 +170,9 @@ def create_venue_submission():
         db.session.commit()
     try:
         new_venue = Venue(name=add('name'), city=add('city'), state=add('state'), address=add('address'),
-                          phone=add('phone'), genre=genres, website_link=add('website_link'),
+                          phone=add('phone'), genres=genres, website_link=add('website_link'),
                           facebook_link=add('facebook_link'),
-                          looking_for_talent=add('seeking_talent'), seeking_description=add('seeking_description'),
+                          looking_for_talent=form.seeking_talent.data, seeking_description=add('seeking_description'),
                           area=area.id)
         db.session.add(new_venue)
         db.session.commit()
@@ -199,7 +211,6 @@ def artists():
     return render_template('pages/artists.html', artists=data)
 
 
-
 @app.route('/artists/search', methods=['POST'])
 def search_artists():
     searched_term = request.form.get('search_term')
@@ -230,6 +241,7 @@ def edit_artist(artist_id):
     form.state.data = artist.state
     form.city.data = artist.state
     form.phone.data = artist.phone
+    form.image_link.data = artist.image_link
     form.facebook_link.data = artist.facebook_link
     form.website_link.data = artist.website_link
     form.seeking_venue.data = artist.looking_for_venues
@@ -260,26 +272,37 @@ def edit_artist_submission(artist_id):
 @app.route('/venues/<int:venue_id>/edit', methods=['GET'])
 def edit_venue(venue_id):
     form = VenueForm()
-    venue = {
-        "id": 1,
-        "name": "The Musical Hop",
-        "genres": ["Jazz", "Reggae", "Swing", "Classical", "Folk"],
-        "address": "1015 Folsom Street",
-        "city": "San Francisco",
-        "state": "CA",
-        "phone": "123-123-1234",
-        "website": "https://www.themusicalhop.com",
-        "facebook_link": "https://www.facebook.com/TheMusicalHop",
-        "seeking_talent": True,
-        "seeking_description": "We are on the lookout for a local artist to play every two weeks. Please call us.",
-        "image_link": "https://images.unsplash.com/photo-1543900694-133f37abaaa5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=400&q=60"
-    }
+    venue = Venue.query.get(venue_id)
+    form.name.data = venue.name
+    form.genres.data = venue.genres.split()
+    form.state.data = venue.state
+    form.address.data = venue.address
+    form.city.data = venue.city
+    form.phone.data = venue.phone
+    form.image_link.data = venue.image_link
+    form.facebook_link.data = venue.facebook_link
+    form.website_link.data = venue.website_link
+    form.seeking_description.data = venue.seeking_description
+
     # TODO: populate form with values from venue with ID <venue_id>
     return render_template('forms/edit_venue.html', form=form, venue=venue)
 
 
 @app.route('/venues/<int:venue_id>/edit', methods=['POST'])
 def edit_venue_submission(venue_id):
+    venue = Venue.query.get(venue_id)
+    form = VenueForm()
+    venue.name = form.name.data
+    venue.phone = form.phone.data
+    venue.city = form.city.data
+    venue.state = form.state.data
+    venue.address = form.address.data
+    venue.genres = ' '.join(form.genres.data)
+    venue.image_link = form.image_link.data
+    venue.website_link = form.website_link.data
+    venue.looking_for_talent = form.seeking_talent.data
+    venue.seeking_description = form.seeking_description.data
+    db.session.commit()
     # TODO: take values from the form submitted, and update existing
     # venue record with ID <venue_id> using the new attributes
     return redirect(url_for('show_venue', venue_id=venue_id))
@@ -299,7 +322,7 @@ def create_artist_submission():
     add = request.form.get
     form = ArtistForm()
     try:
-        genres = ' '.join(form.genres.data) # converts the list of genres before storing
+        genres = ' '.join(form.genres.data)  # converts the list of genres before storing
 
         new_artist = Artist(name=add('name'), city=add('city'), state=add('state'),
                             phone=add('phone'), genres=genres, website_link=add('website_link'),
@@ -321,42 +344,7 @@ def create_artist_submission():
 def shows():
     # displays list of shows at /shows
     # TODO: replace with real venues data.
-    data = [{
-        "venue_id": 1,
-        "venue_name": "The Musical Hop",
-        "artist_id": 4,
-        "artist_name": "Guns N Petals",
-        "artist_image_link": "https://images.unsplash.com/photo-1549213783-8284d0336c4f?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=300&q=80",
-        "start_time": "2019-05-21T21:30:00.000Z"
-    }, {
-        "venue_id": 3,
-        "venue_name": "Park Square Live Music & Coffee",
-        "artist_id": 5,
-        "artist_name": "Matt Quevedo",
-        "artist_image_link": "https://images.unsplash.com/photo-1495223153807-b916f75de8c5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=334&q=80",
-        "start_time": "2019-06-15T23:00:00.000Z"
-    }, {
-        "venue_id": 3,
-        "venue_name": "Park Square Live Music & Coffee",
-        "artist_id": 6,
-        "artist_name": "The Wild Sax Band",
-        "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-        "start_time": "2035-04-01T20:00:00.000Z"
-    }, {
-        "venue_id": 3,
-        "venue_name": "Park Square Live Music & Coffee",
-        "artist_id": 6,
-        "artist_name": "The Wild Sax Band",
-        "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-        "start_time": "2035-04-08T20:00:00.000Z"
-    }, {
-        "venue_id": 3,
-        "venue_name": "Park Square Live Music & Coffee",
-        "artist_id": 6,
-        "artist_name": "The Wild Sax Band",
-        "artist_image_link": "https://images.unsplash.com/photo-1558369981-f9ca78462e61?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=794&q=80",
-        "start_time": "2035-04-15T20:00:00.000Z"
-    }]
+    data = Shows.query.all()
     return render_template('pages/shows.html', shows=data)
 
 
@@ -371,7 +359,15 @@ def create_shows():
 def create_show_submission():
     # called to create new shows in the db, upon submitting new show listing form
     # TODO: insert form data as a new Show record in the db, instead
-
+    form = ShowForm()
+    artist_id = request.form.get('artist_id')
+    venue_id = request.form.get('venue_id')
+    artist = Artist.query.get(artist_id)
+    venue_name = Venue.query.get(venue_id).name
+    show = Shows(artist_id=artist.id, artist_image_link=artist.image_link,venue_id=venue_id, show_time=form.start_time.data,
+                 artist_name=artist.name, venue_name=venue_name)
+    db.session.add(show)
+    db.session.commit()
     # on successful db insert, flash success
     flash('Show was successfully listed!')
     # TODO: on unsuccessful db insert, flash an error instead.
@@ -379,9 +375,11 @@ def create_show_submission():
     # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
     return render_template('pages/home.html')
 
+
 @app.shell_context_processor
 def shell():
-    return {'db':db}
+    return {'db': db, 'venue': Venue, 'artist': Artist, 'area': Area, 'show': Shows}
+
 
 @app.errorhandler(404)
 def not_found_error(error):
