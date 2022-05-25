@@ -13,6 +13,7 @@ from flask_migrate import Migrate
 from logging import Formatter, FileHandler
 from flask_wtf import Form
 from forms import *
+import datetime
 
 # ----------------------------------------------------------------------------#
 # App Config.
@@ -30,18 +31,6 @@ migrate = Migrate(app, db)
 # ----------------------------------------------------------------------------#
 # Models.
 # ----------------------------------------------------------------------------#
-class Shows(db.Model):
-    __tablename__ = 'Shows'
-    id = db.Column(db.Integer, primary_key=True)
-    artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'), nullable=False)
-    venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'), nullable=False)
-    show_time = db.Column(db.String(100), nullable=False)
-    artist_name = db.Column(db.String(100))
-    artist_image_link = db.Column(db.String(250))
-    venue_name = db.Column(db.String(100))
-
-
-
 
 class Area(db.Model):
     __tablename__ = 'Area'
@@ -69,6 +58,23 @@ class Venue(db.Model):
     area = db.Column(db.Integer, db.ForeignKey('Area.id'), nullable=False)
     shows = db.relationship('Shows', backref='venue', lazy=True)
 
+    def past_shows(self):
+        past_shows = [i for i in self.shows if i.show_time <= datetime.datetime.utcnow()]
+        return past_shows
+
+    def upcoming_shows(self):
+        upcoming_shows = [i for i in self.shows if i.show_time >= datetime.datetime.utcnow()]
+        return upcoming_shows
+
+    def past_shows_count(self):
+        past_shows = [i for i in self.shows if i.show_time <= datetime.datetime.utcnow()]
+        return len(past_shows)
+
+    def upcoming_shows_count(self):
+        upcoming_shows = [i for i in self.shows if i.show_time >= datetime.datetime.utcnow()]
+        return len(upcoming_shows)
+
+
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
 
@@ -87,7 +93,41 @@ class Artist(db.Model):
     looking_for_venues = db.Column(db.Boolean())
     seeking_description = db.Column(db.String(200))
     shows = db.relationship('Shows', backref='artist', lazy=True)
+
+    def past_shows(self):
+        past_shows = [i for i in self.shows if i.show_time <= datetime.datetime.utcnow()]
+        return past_shows
+
+    def upcoming_shows(self):
+        upcoming_shows = [i for i in self.shows if i.show_time >= datetime.datetime.utcnow()]
+        return upcoming_shows
+
+    def past_shows_count(self):
+        past_shows = [i for i in self.shows if i.show_time <= datetime.datetime.utcnow()]
+        return len(past_shows)
+
+    def upcoming_shows_count(self):
+        upcoming_shows = [i for i in self.shows if i.show_time >= datetime.datetime.utcnow()]
+        return len(upcoming_shows)
+
+
+
+
+
+
+
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
+
+
+class Shows(db.Model):
+    __tablename__ = 'Shows'
+    id = db.Column(db.Integer, primary_key=True)
+    artist_id = db.Column(db.Integer, db.ForeignKey('Artist.id'))
+    venue_id = db.Column(db.Integer, db.ForeignKey('Venue.id'))
+    show_time = db.Column(db.DateTime(), nullable=False)
+    artist_name = db.Column(db.String(100))
+    artist_image_link = db.Column(db.String(250))
+    venue_name = db.Column(db.String(100))
 
 
 # TODO Implement Show and Artist models, and complete all model relationships and properties, as a database migration.
@@ -97,7 +137,7 @@ class Artist(db.Model):
 # ----------------------------------------------------------------------------#
 
 def format_datetime(value, format='medium'):
-    date = dateutil.parser.parse(value)
+    date = dateutil.parser.parse(str(value))
     if format == 'full':
         format = "EEEE MMMM, d, y 'at' h:mma"
     elif format == 'medium':
@@ -106,6 +146,8 @@ def format_datetime(value, format='medium'):
 
 
 app.jinja_env.filters['datetime'] = format_datetime
+
+
 
 
 # ----------------------------------------------------------------------------#
@@ -130,9 +172,6 @@ def venues():
 
 @app.route('/venues/search', methods=['POST'])
 def search_venues():
-    # TODO: implement search on artists with partial string search. Ensure it is case-insensitive.
-    # seach for Hop should return "The Musical Hop".
-    # search for "Music" should return "The Musical Hop" and "Park Square Live Music & Coffee"
     searched_term = request.form.get('search_term')
     response = (Venue.query.filter((Venue.city.ilike('%' + searched_term + '%') |
                                     Venue.name.ilike('%' + searched_term + '%') |
@@ -183,11 +222,11 @@ def create_venue_submission():
     return render_template('pages/home.html')
 
 
-@app.route('/venues/<venue_id>', methods=['DELETE'])
+@app.route('/venues/delete/<venue_id>')
 def delete_venue(venue_id):
     venue = Venue.query.get(venue_id)
     try:
-        venue.delete()
+        db.session.delete(venue)
         db.session.commit()
         flash(f'Venue {venue.name} has been deleted')
         return redirect(url_for('index'))
@@ -195,6 +234,7 @@ def delete_venue(venue_id):
         db.session.rollback()
         flash(f'Venue {venue.name} could not be deleted')
         return redirect(url_for('index'))
+
     # TODO: Complete this endpoint for taking a venue_id, and using
     # SQLAlchemy ORM to delete a record. Handle cases where the session commit could fail.
 
@@ -226,8 +266,8 @@ def search_artists():
 def show_artist(artist_id):
     # shows the artist page with the given artist_id
     # TODO: replace with real artist data from the artist table, using artist_id
-    data = Artist.query.get(artist_id)
-    return render_template('pages/show_artist.html', artist=data)
+    artist = Artist.query.get(artist_id)
+    return render_template('pages/show_artist.html', artist=artist)
 
 
 #  Update
@@ -279,6 +319,7 @@ def edit_venue(venue_id):
     form.address.data = venue.address
     form.city.data = venue.city
     form.phone.data = venue.phone
+    form.seeking_talent.data = venue.looking_for_talent
     form.image_link.data = venue.image_link
     form.facebook_link.data = venue.facebook_link
     form.website_link.data = venue.website_link
@@ -342,7 +383,7 @@ def create_artist_submission():
 
 @app.route('/shows')
 def shows():
-    # displays list of shows at /shows
+    # displays list of shows at shows
     # TODO: replace with real venues data.
     data = Shows.query.all()
     return render_template('pages/shows.html', shows=data)
@@ -359,20 +400,21 @@ def create_shows():
 def create_show_submission():
     # called to create new shows in the db, upon submitting new show listing form
     # TODO: insert form data as a new Show record in the db, instead
-    form = ShowForm()
-    artist_id = request.form.get('artist_id')
-    venue_id = request.form.get('venue_id')
-    artist = Artist.query.get(artist_id)
-    venue_name = Venue.query.get(venue_id).name
-    show = Shows(artist_id=artist.id, artist_image_link=artist.image_link,venue_id=venue_id, show_time=form.start_time.data,
-                 artist_name=artist.name, venue_name=venue_name)
-    db.session.add(show)
-    db.session.commit()
-    # on successful db insert, flash success
-    flash('Show was successfully listed!')
-    # TODO: on unsuccessful db insert, flash an error instead.
-    # e.g., flash('An error occurred. Show could not be listed.')
-    # see: http://flask.pocoo.org/docs/1.0/patterns/flashing/
+    try:
+        form = ShowForm()
+        artist_id = request.form.get('artist_id')
+        venue_id = request.form.get('venue_id')
+        artist = Artist.query.get(artist_id)
+        venue_name = Venue.query.get(venue_id).name
+        show = Shows(artist_id=artist.id, artist_image_link=artist.image_link, venue_id=venue_id,
+                     show_time=request.form.get('start_time'),
+                     artist_name=artist.name, venue_name=venue_name)
+        db.session.add(show)
+        db.session.commit()
+        flash('Show was successfully listed!')
+    except:
+        db.session.rollback()
+        flash('Show could not be listed')
     return render_template('pages/home.html')
 
 
