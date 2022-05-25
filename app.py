@@ -58,7 +58,7 @@ class Venue(db.Model):
     date_created = db.Column(db.DateTime(), default=datetime.datetime.utcnow())
     area = db.Column(db.Integer, db.ForeignKey('Area.id'), nullable=False)
     shows = db.relationship('Shows', backref='venue', lazy=True)
-    
+
     def past_shows(self):
         past_shows = [i for i in self.shows if i.show_time <= datetime.datetime.utcnow()]
         return past_shows
