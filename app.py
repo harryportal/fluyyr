@@ -55,9 +55,10 @@ class Venue(db.Model):
     facebook_link = db.Column(db.String(120))
     looking_for_talent = db.Column(db.Boolean(), default=False)
     seeking_description = db.Column(db.String(200), default=None)
+    date_created = db.Column(db.DateTime(), default=datetime.datetime.utcnow())
     area = db.Column(db.Integer, db.ForeignKey('Area.id'), nullable=False)
     shows = db.relationship('Shows', backref='venue', lazy=True)
-
+    
     def past_shows(self):
         past_shows = [i for i in self.shows if i.show_time <= datetime.datetime.utcnow()]
         return past_shows
@@ -73,7 +74,6 @@ class Venue(db.Model):
     def upcoming_shows_count(self):
         upcoming_shows = [i for i in self.shows if i.show_time >= datetime.datetime.utcnow()]
         return len(upcoming_shows)
-
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
@@ -92,6 +92,7 @@ class Artist(db.Model):
     website_link = db.Column(db.String(120))
     looking_for_venues = db.Column(db.Boolean())
     seeking_description = db.Column(db.String(200))
+    date_created = db.Column(db.DateTime(), default=datetime.datetime.utcnow())
     shows = db.relationship('Shows', backref='artist', lazy=True)
 
     def past_shows(self):
@@ -109,12 +110,6 @@ class Artist(db.Model):
     def upcoming_shows_count(self):
         upcoming_shows = [i for i in self.shows if i.show_time >= datetime.datetime.utcnow()]
         return len(upcoming_shows)
-
-
-
-
-
-
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
@@ -148,15 +143,18 @@ def format_datetime(value, format='medium'):
 app.jinja_env.filters['datetime'] = format_datetime
 
 
-
-
 # ----------------------------------------------------------------------------#
 # Controllers.
 # ----------------------------------------------------------------------------#
 
 @app.route('/')
 def index():
-    return render_template('pages/home.html')
+    # Shows Recent Listed Artists and Recently Listed Venues on the homepage, returning results
+    # for Artists and Venues sorting by newly created. Limit to the 10 most recently
+    # listed items.
+    recent_artists = Artist.query.order_by(Artist.date_created).limit(10).all()
+    recent_venues = Venue.query.order_by(Venue.date_created).limit(10).all()
+    return render_template('pages/home.html', recent_artists=recent_artists, recent_venues=recent_venues)
 
 
 #  Venues
@@ -219,7 +217,7 @@ def create_venue_submission():
     except:
         db.session.rollback()
         flash('An error occurred. Venue ' + add('name') + ' could not be listed.')
-    return render_template('pages/home.html')
+    return redirect(url_for('index'))
 
 
 @app.route('/venues/delete/<venue_id>')
@@ -375,7 +373,7 @@ def create_artist_submission():
     except:
         db.session.rollback()
         flash('An error occurred. Artist ' + add('name') + ' could not be listed.')
-    return render_template('pages/home.html')
+    return redirect(url_for('index'))
 
 
 #  Shows
@@ -415,7 +413,7 @@ def create_show_submission():
     except:
         db.session.rollback()
         flash('Show could not be listed')
-    return render_template('pages/home.html')
+    return redirect(url_for('index'))
 
 
 @app.shell_context_processor
@@ -447,7 +445,5 @@ if not app.debug:
 # Launch.
 # ----------------------------------------------------------------------------#
 
-
-# Or specify port manually
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=3000)
