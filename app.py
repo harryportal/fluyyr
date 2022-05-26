@@ -255,7 +255,6 @@ def edit_venue(venue_id):
 def edit_venue_submission(venue_id):
     venue = Venue.query.get(venue_id)
     form = VenueForm(request.form)
-    print(form.genres.data)
     if form.validate():
         venue.name = form.name.data
         venue.phone = form.phone.data
