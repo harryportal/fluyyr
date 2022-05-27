@@ -20,6 +20,9 @@ class Venue(db.Model):
     seeking_description = db.Column(db.String(200), default=None)
     date_created = db.Column(db.DateTime(), default=datetime.datetime.utcnow())
     shows = db.relationship('Show', backref='venue', lazy=True)
+    
+    def __str__(self):
+        return f'Name:{self.name}'
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
@@ -40,6 +43,9 @@ class Artist(db.Model):
     seeking_description = db.Column(db.String(200))
     date_created = db.Column(db.DateTime(), default=datetime.datetime.utcnow())
     shows = db.relationship('Show', backref='artist', lazy=True)
+    
+    def __str__(self):
+        return f'Name:{self.name}'
 
     # TODO: implement any missing fields, as a database migration using Flask-Migrate
 
@@ -50,5 +56,7 @@ class Show(db.Model):
     artist_id = db.Column(db.Integer, db.ForeignKey('artists.id'))
     venue_id = db.Column(db.Integer, db.ForeignKey('venues.id'))
     show_time = db.Column(db.DateTime(), nullable=False)
-
+ 
+    def __str__(self):
+        return f'Name:{self.name}'
 # TODO Implement Show and Artist models, and complete all model relationships and properties, as a database migration.
