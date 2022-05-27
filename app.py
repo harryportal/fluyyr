@@ -15,7 +15,6 @@ from flask_wtf import Form
 from forms import *
 from models import Show, Artist,Venue
 from models import db
-
 # ----------------------------------------------------------------------------#
 # App Config.
 # ----------------------------------------------------------------------------#
@@ -25,14 +24,6 @@ moment = Moment(app)
 app.config.from_object('config')
 db.init_app(app)
 migrate = Migrate(app, db)
-
-
-# TODO: connect to a local postgresql database
-
-# ----------------------------------------------------------------------------#
-# Models.
-# ----------------------------------------------------------------------------#
-
 
 # ----------------------------------------------------------------------------#
 # Filters.
@@ -70,8 +61,26 @@ def index():
 @app.route('/venues')
 def venues():
     # TODO: replace with real venues data.
-    #       num_upcoming_shows should be aggregated based on number of upcoming shows per venue.
-    data = Venue.query.all()
+    # num_upcoming_shows should be aggregated based on number of upcoming shows per venue.
+    data = []
+    venues = Venue.query.all()
+    locations = set()
+    for venue in venues:
+        locations.add((venue.city, venue.state))
+    for location in locations:
+        data.append({
+            "city": location[0],
+            "state": location[1],
+            "venues": []
+        })
+    for venue in venues:
+        for i in data:
+            if i['city'] == venue.city and i['state'] == venue.state:
+                upcoming_shows = Show.query.join(Venue).filter(Venue.id == venue.id).filter(
+                    Show.show_time > datetime.utcnow())
+                i['venues'].append(
+                    {'id': venue.id, 'name': venue.name, 'num_upcoming_shows': upcoming_shows.count()})
+                break
     return render_template('pages/venues.html', areas=data)
 
 
@@ -80,8 +89,8 @@ def search_venues():
     searched_term = request.form.get('search_term')
     response = (Venue.query.filter((Venue.city.ilike('%' + searched_term + '%') |
                                     Venue.name.ilike('%' + searched_term + '%') |
-                                    Venue.state.ilike('%' + searched_term + '%') |
-                                    Venue.genres.ilike('%' + searched_term + '%'))))
+                                    Venue.state.ilike('%' + searched_term + '%') )))
+
     return render_template('pages/search_venues.html', results=response,
                            search_term=request.form.get('search_term', ''))
 
@@ -108,20 +117,13 @@ def create_venue_submission():
     form = VenueForm(request.form)
     if form.validate():
         add = request.form.get  # to avoid repetition
-        genres = ' '.join(form.genres.data)  # converts the list of genres to a str ing before storing it
-        # check database if area exist, else create a new area using the city and state and link it to the venue
-        area = Area.query.filter_by(city=add('city'), state=add('state')).first()
-        if not area:
-            area = Area(city=add('city'), state=add('state'))
-            db.session.add(area)
-            db.session.commit()
         try:
+            print(request.form.getlist('genres'))
             new_venue = Venue(name=add('name'), city=add('city'), state=add('state'), address=add('address'),
-                              phone=add('phone'), genres=genres, website_link=add('website_link'),
+                              phone=add('phone'), genres=request.form.getlist('genres'), website_link=add('website_link'),
                               facebook_link=add('facebook_link'),
                               looking_for_talent=form.seeking_talent.data,
-                              seeking_description=add('seeking_description'),
-                              area=area.id)
+                              seeking_description=add('seeking_description'))
 
             db.session.add(new_venue)
             db.session.commit()
@@ -170,8 +172,7 @@ def search_artists():
     searched_term = request.form.get('search_term')
     response = (Artist.query.filter((Artist.city.ilike('%' + searched_term + '%') |
                                      Artist.name.ilike('%' + searched_term + '%') |
-                                     Artist.state.ilike('%' + searched_term + '%') |
-                                     Artist.genres.ilike('%' + searched_term + '%'))))
+                                     Artist.state.ilike('%' + searched_term + '%'))))
     return render_template('pages/search_artists.html', results=response,
                            search_term=request.form.get('search_term', ''))
 
@@ -194,7 +195,7 @@ def edit_artist(artist_id):
     artist = Artist.query.get(artist_id)
     form = ArtistForm()
     form.name.data = artist.name
-    form.genres.data = artist.genres.split()
+    form.genres.data = artist.genres
     form.state.data = artist.state
     form.city.data = artist.state
     form.phone.data = artist.phone
@@ -216,7 +217,7 @@ def edit_artist_submission(artist_id):
         artist.phone = form.phone.data
         artist.city = form.city.data
         artist.state = form.state.data
-        artist.genres = ' '.join(form.genres.data)
+        artist.genres = form.genres.data
         artist.image_link = form.image_link.data
         artist.website_link = form.website_link.data
         artist.looking_for_venues = form.seeking_venue.data
@@ -236,7 +237,7 @@ def edit_venue(venue_id):
     form = VenueForm()
     venue = Venue.query.get(venue_id)
     form.name.data = venue.name
-    form.genres.data = venue.genres.split()
+    form.genres.data = venue.genres
     form.state.data = venue.state
     form.address.data = venue.address
     form.city.data = venue.city
@@ -261,7 +262,7 @@ def edit_venue_submission(venue_id):
         venue.city = form.city.data
         venue.state = form.state.data
         venue.address = form.address.data
-        venue.genres = ' '.join(form.genres.data)
+        venue.genres = form.genres.data
         venue.image_link = form.image_link.data
         venue.website_link = form.website_link.data
         venue.looking_for_talent = form.seeking_talent.data
@@ -291,19 +292,17 @@ def create_artist_submission():
     form = ArtistForm(request.form)
     if form.validate():
         try:
-            genres = ' '.join(form.genres.data)  # converts the list of genres before storing
-
             new_artist = Artist(name=add('name'), city=add('city'), state=add('state'),
-                                phone=add('phone'), genres=genres, website_link=add('website_link'),
+                                phone=add('phone'), website_link=add('website_link'), genres=request.form.getlist('genres'),
                                 facebook_link=add('facebook_link'), image_link=add('image_link'),
                                 looking_for_venues=add('seeking_venue'), seeking_description=add('seeking_description'))
             db.session.add(new_artist)
             db.session.commit()
             flash('Artist' + request.form['name'] + ' was successfully listed!')
+            return redirect(url_for('index'))
         except:
-            db.session.rollback()
-            flash('An error occurred. Artist ' + add('name') + ' could not be listed.')
-        return redirect(url_for('index'))
+            flash('Artist' + request.form['name'] + ' could not listed!')
+            return redirect(url_for('index'))
     else:
         flash(f'An error occurred, Please check form and try again')
         return redirect(url_for('index'))
