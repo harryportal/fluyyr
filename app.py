@@ -13,7 +13,7 @@ from flask_migrate import Migrate
 from logging import Formatter, FileHandler
 from flask_wtf import Form
 from forms import *
-from models import Show, Artist, Area, Venue
+from models import Show, Artist,Venue
 from models import db
 
 # ----------------------------------------------------------------------------#
@@ -21,9 +21,9 @@ from models import db
 # ----------------------------------------------------------------------------#
 
 app = Flask(__name__)
-db.init_app(app)
 moment = Moment(app)
 app.config.from_object('config')
+db.init_app(app)
 migrate = Migrate(app, db)
 
 
@@ -71,7 +71,7 @@ def index():
 def venues():
     # TODO: replace with real venues data.
     #       num_upcoming_shows should be aggregated based on number of upcoming shows per venue.
-    data = Area.query.all()
+    data = Venue.query.all()
     return render_template('pages/venues.html', areas=data)
 
 
@@ -357,7 +357,7 @@ def create_show_submission():
 
 @app.shell_context_processor
 def shell():
-    return {'db': db, 'venues': Venue, 'artists': Artist, 'areas': Area, 'show': Show}
+    return {'db': db, 'venues': Venue, 'artists': Artist, 'show': Show}
 
 
 @app.errorhandler(404)
