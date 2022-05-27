@@ -1,6 +1,5 @@
 from datetime import datetime
 from flask_wtf import Form
-from models import Genre, State
 from wtforms import StringField, SelectField, SelectMultipleField, DateTimeField, BooleanField
 from wtforms.validators import DataRequired, AnyOf, URL, Optional, Regexp
 
